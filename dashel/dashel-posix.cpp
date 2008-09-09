@@ -720,6 +720,7 @@ namespace Dashel
 				if (ps.get("parity") == "odd")
 					newtio.c_cflag |= PARODD;	// parity for input and output is odd.
 			}
+#ifndef MACOSX
 			switch (ps.get<int>("baud"))
 			{
 				case 50: newtio.c_cflag |= B50; break;
@@ -740,7 +741,6 @@ namespace Dashel
 				case 57600: newtio.c_cflag |= B57600; break;
 				case 115200: newtio.c_cflag |= B115200; break;
 				case 230400: newtio.c_cflag |= B230400; break;
-#ifndef MACOSX
 				case 460800: newtio.c_cflag |= B460800; break;
 				case 500000: newtio.c_cflag |= B500000; break;
 				case 576000: newtio.c_cflag |= B576000; break;
@@ -753,9 +753,12 @@ namespace Dashel
 				case 3000000: newtio.c_cflag |= B3000000; break;
 				case 3500000: newtio.c_cflag |= B3500000; break;
 				case 4000000: newtio.c_cflag |= B4000000; break;
-#endif
 				default: throw DashelException(DashelException::ConnectionFailed, 0, "Invalid baud rate.");
 			}
+#else
+			if (cfsetspeed(&newtio, ps.get<speed_t>("baud")) < 0)
+				throw DashelException(DashelException::ConnectionFailed, errno, "Invalid baud rate");
+#endif
 			
 			newtio.c_iflag = IGNPAR;			// ignore parity on input
 			
@@ -767,8 +770,12 @@ namespace Dashel
 			newtio.c_cc[VMIN] = 1;				// one byte is sufficient to return
 			
 			// set attributes
-			if ((tcflush(fd, TCIOFLUSH) < 0) || (tcsetattr(fd, TCSANOW, &newtio) < 0))
-				throw DashelException(DashelException::ConnectionFailed, 0, "Cannot setup serial port. The requested baud rate might not be supported.");
+			if (tcflush(fd, TCIOFLUSH) < 0)
+				throw DashelException(DashelException::ConnectionFailed, errno, "Cannot setup serial port. tcflush returned an error. The requested baud rate might not be supported.");
+				
+			if (tcsetattr(fd, TCSANOW, &newtio) < 0)
+				throw DashelException(DashelException::ConnectionFailed, errno, "Cannot setup serial port. tcsetattr returned an error. The requested baud rate might not be supported.");
+				
 		}
 		
 		//! Destructor, restore old serial port state
